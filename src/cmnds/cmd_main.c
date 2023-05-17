@@ -122,6 +122,23 @@ static commandResult_t CMD_ScheduleHADiscovery(const void* context, const char* 
 
 	return CMD_RES_OK;
 }
+static commandResult_t CMD_SetFlag(const void* context, const char* cmd, const char* args, int cmdFlags) {
+	int flag, val;
+
+	Tokenizer_TokenizeString(args, 0);
+
+	// following check must be done after 'Tokenizer_TokenizeString',
+	// so we know arguments count in Tokenizer. 'cmd' argument is
+	// only for warning display
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 2)) {
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	flag = Tokenizer_GetArgInteger(0);
+	val = Tokenizer_GetArgInteger(1);
+	CFG_SetFlag(flag, val);
+
+	return CMD_RES_OK;
+}
 static commandResult_t CMD_Flags(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	union {
 		long long newValue;
@@ -347,14 +364,14 @@ static commandResult_t CMD_SafeMode(const void* context, const char* cmd, const 
 
 
 
-void CMD_UART_Init() {
+void CMD_UARTConsole_Init() {
 #if PLATFORM_BEKEN
 	UART_InitUART(115200);
 	cmd_uartInitIndex = g_uart_init_counter;
 	UART_InitReceiveRingBuffer(512);
 #endif
 }
-void CMD_UART_Run() {
+void CMD_UARTConsole_Run() {
 #if PLATFORM_BEKEN
 	char a;
 	int i;
@@ -394,11 +411,11 @@ void CMD_RunUartCmndIfRequired() {
 #if PLATFORM_BEKEN
 	if (CFG_HasFlag(OBK_FLAG_CMD_ACCEPT_UART_COMMANDS)) {
 		if (cmd_uartInitIndex && cmd_uartInitIndex == g_uart_init_counter) {
-			CMD_UART_Run();
+			CMD_UARTConsole_Run();
 		}
 	}
 #endif
-	}
+}
 
 // run an aliased command
 static commandResult_t runcmd(const void* context, const char* cmd, const char* args, int cmdFlags) {
@@ -467,6 +484,106 @@ static commandResult_t CMD_SimonTest(const void* context, const char* cmd, const
 
 	return CMD_RES_OK;
 }
+/*
+int Flash_FindPattern(byte *data, int dataSize, int startOfs, int endOfs) {
+	int i;
+	float val;
+	const char *stop;
+	byte* buffer;
+	int at;
+	int res;
+	int matching;
+
+	matching = 0;
+
+	buffer = malloc(1024);
+
+	at = startOfs;
+	while (at < endOfs) {
+		int readlen = endOfs - at;
+		if (readlen > 1024) {
+			readlen = 1024;
+		}
+
+		res = flash_read((byte*)buffer, readlen, at);
+
+
+		// Search for the pattern in the buffer
+		for (i = 0; i < readlen; i++) {
+			if (buffer[i] == data[matching]) {
+				matching++;
+				if (matching == dataSize) {
+					free(buffer);
+					return at + i - dataSize + 1;  // Pattern found, return the offset
+				}
+			}
+			else {
+				matching = 0;  
+				if (buffer[i] == data[matching]) {
+					matching++;
+				}
+			}
+		}
+		at += readlen;
+
+	}
+	free(buffer);
+	return -1;
+}
+*/
+// FindPattern 0x0 0x200000 46DCED0E672F3B70AE1276A3F8712E03
+/*
+commandResult_t CMD_FindPattern(const void *context, const char *cmd, const char *args, int cmdFlags) {
+	int startOfs, endOfs;
+	int maxData;
+	int realDataSize;
+	const char *hexStr;
+	byte b;
+	byte *data;
+	int result;
+
+	Tokenizer_TokenizeString(args, 0);
+
+	startOfs = Tokenizer_GetArgInteger(0);
+	endOfs = Tokenizer_GetArgInteger(1);
+	hexStr = Tokenizer_GetArg(2);
+
+	maxData = strlen(hexStr);
+	realDataSize = 0;
+
+	data = malloc(maxData);
+
+	while (hexStr[0] && hexStr[1]) {
+		b = hexbyte(hexStr);
+
+		data[realDataSize] = b;
+		realDataSize++;
+
+		hexStr += 2;
+	}
+	result = Flash_FindPattern(data, realDataSize, startOfs, endOfs);
+
+	ADDLOG_INFO(LOG_FEATURE_CMD, "Pattern is at %i",result);
+
+	return CMD_RES_OK;
+}*/
+
+commandResult_t CMD_DeepSleep_SetEdge(const void* context, const char* cmd, const char* args, int cmdFlags) {
+
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_DONT_EXPAND);
+	// following check must be done after 'Tokenizer_TokenizeString',
+	// so we know arguments count in Tokenizer. 'cmd' argument is
+	// only for warning display
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
+	{
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+
+	g_defaultWakeEdge = Tokenizer_GetArgInteger(0);
+
+	return CMD_RES_OK;
+}
+
 void CMD_Init_Early() {
 	//cmddetail:{"name":"alias","args":"[Alias][Command with spaces]",
 	//cmddetail:"descr":"add an aliased command, so a command with spaces can be called with a short, nospaced alias",
@@ -548,6 +665,11 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_Flags","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("flags", CMD_Flags, NULL);
+	//cmddetail:{"name":"SetFlag","args":"[FlagIndex][0or1]",
+	//cmddetail:"descr":"Sets given flag",
+	//cmddetail:"fn":"CMD_SetFlag","file":"cmnds/cmd_main.c","requires":"",
+	//cmddetail:"examples":""}
+	CMD_RegisterCommand("SetFlag", CMD_SetFlag, NULL);
 	//cmddetail:{"name":"ClearNoPingTime","args":"",
 	//cmddetail:"descr":"Command for ping watchdog; it sets the 'time since last ping reply' to 0 again",
 	//cmddetail:"fn":"CMD_ClearNoPingTime","file":"cmnds/cmd_main.c","requires":"",
@@ -563,6 +685,11 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_OpenAP","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("OpenAP", CMD_OpenAP, NULL);
+	//cmddetail:{"name":"DSEdge","args":"[edgeCode]",
+	//cmddetail:"descr":"DoorSensor driver configuration command. 0 means always wake up on rising edge, 1 means on falling, 2 means if state is high, use falling edge, if low, use rising. Default is 2",
+	//cmddetail:"fn":"CMD_DeepSleep_SetEdge","file":"drv/drv_doorSensorWithDeepSleep.c","requires":"",
+	//cmddetail:"examples":""}
+	CMD_RegisterCommand("DSEdge", CMD_DeepSleep_SetEdge, NULL);
 	//cmddetail:{"name":"SafeMode","args":"",
 	//cmddetail:"descr":"Forces device reboot into safe mode (open ap with disabled drivers)",
 	//cmddetail:"fn":"CMD_SafeMode","file":"cmnds/cmd_main.c","requires":"",
@@ -583,22 +710,28 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_StartupCommand","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("StartupCommand", CMD_StartupCommand, NULL);
+	//CMD_RegisterCommand("FindPattern", CMD_FindPattern, NULL);
 	
 #if (defined WINDOWS) || (defined PLATFORM_BEKEN)
 	CMD_InitScripting();
 #endif
 	if (!bSafeMode) {
 		if (CFG_HasFlag(OBK_FLAG_CMD_ACCEPT_UART_COMMANDS)) {
-			CMD_UART_Init();
+			CMD_UARTConsole_Init();
 		}
 	}
 	//DRV_InitFlashMemoryTestFunctions();
 }
 
+
+
 void CMD_Init_Delayed() {
 	if (CFG_HasFlag(OBK_FLAG_CMD_ENABLETCPRAWPUTTYSERVER)) {
 		CMD_StartTCPCommandLine();
 	}
+#if defined(PLATFORM_BEKEN) || defined(WINDOWS) || defined(PLATFORM_BL602)
+	UART_AddCommands();
+#endif
 }
 
 

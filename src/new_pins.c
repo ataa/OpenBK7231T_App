@@ -33,7 +33,7 @@
 int BTN_SHORT_MS;
 int BTN_LONG_MS;
 int BTN_HOLD_REPEAT_MS;
-byte g_defaultDoorWakeEdge = 2;
+byte g_defaultWakeEdge = 2;
 int g_initialPinStates = 0;
 
 typedef enum {
@@ -142,7 +142,7 @@ void PINS_BeginDeepSleepWithPinWakeUp() {
 			// https://www.elektroda.pl/rtvforum/viewtopic.php?p=20543190#20543190
 			// forcing a certain edge for both states helps on some door sensors, somehow
 			// 0 means always wake up on rising edge, 1 means on falling, 2 means if state is high, use falling edge, if low, use rising
-			if (g_defaultDoorWakeEdge == 2) {
+			if (g_defaultWakeEdge == 2) {
 				value = HAL_PIN_ReadDigitalInput(i);
 				if (value) {
 					// on falling edge wake up
@@ -154,7 +154,7 @@ void PINS_BeginDeepSleepWithPinWakeUp() {
 				}
 			}
 			else {
-				falling = g_defaultDoorWakeEdge;
+				falling = g_defaultWakeEdge;
 			}
 			setGPIActive(i, 1, falling);
 		}
@@ -963,11 +963,11 @@ void CFG_ApplyChannelStartValues() {
 
 		iValue = g_cfg.startChannelValues[i];
 		if (iValue == -1) {
-			g_channelValues[i] = HAL_FlashVars_GetChannelValue(i);
+			g_channelValuesFloats[i] = g_channelValues[i] = HAL_FlashVars_GetChannelValue(i);
 			//addLogAdv(LOG_INFO, LOG_FEATURE_GENERAL, "CFG_ApplyChannelStartValues: Channel %i is being set to REMEMBERED state %i", i, g_channelValues[i]);
 		}
 		else {
-			g_channelValues[i] = iValue;
+			g_channelValuesFloats[i] = g_channelValues[i] = iValue;
 			//addLogAdv(LOG_INFO, LOG_FEATURE_GENERAL, "CFG_ApplyChannelStartValues: Channel %i is being set to constant state %i", i, g_channelValues[i]);
 		}
 	}
@@ -982,6 +982,7 @@ float CHANNEL_GetFinalValue(int channel) {
 	case ChType_Humidity_div10:
 	case ChType_Temperature_div10:
 	case ChType_Voltage_div10:
+	case ChType_Power_div10:
 		dVal = (float)iVal / 10;
 		break;
 	case ChType_Frequency_div100:
@@ -1787,6 +1788,8 @@ const char* g_channelTypeNames[] = {
 	"LowMidHighHighest",
 	"OffLowMidHighHighest",
 	"Custom",
+	"Power_div10",
+	"ReadOnlyLowMidHigh",
 	"error",
 	"error",
 	"error",
