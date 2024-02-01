@@ -530,6 +530,27 @@ typedef enum ioRole_e {
 	//iodetail:"file":"new_pins.h",
 	//iodetail:"driver":""}
 	IOR_TM1638_STB,
+	//iodetail:{"name":"BAT_Relay_n",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"Like BAT_Relay, but inversed. See [battery driver topic here](https://www.elektroda.com/rtvforum/topic3959103.html)",
+	//iodetail:"enum":"IOR_BAT_Relay_n",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_BAT_Relay_n,
+	//iodetail:{"name":"KP18058_CLK",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"QQQ",
+	//iodetail:"enum":"KP18058_CLK",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_KP18058_CLK,
+	//iodetail:{"name":"KP18058_DAT",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"QQQ",
+	//iodetail:"enum":"KP18058_DAT",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_KP18058_DAT,
 	//iodetail:{"name":"Total_Options",
 	//iodetail:"title":"TODO",
 	//iodetail:"descr":"Current total number of available IOR roles",
@@ -803,6 +824,97 @@ typedef enum channelType_e {
 	//chandetail:"file":"new_pins.h",
 	//chandetail:"driver":""}
 	ChType_ReadOnlyLowMidHigh,
+	//chandetail:{"name":"SmokePercent",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Smoke percentage",
+	//chandetail:"enum":"ChType_SmokePercent",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_SmokePercent,
+	//chandetail:{"name":"Illuminance",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Illuminance in Lux",
+	//chandetail:"enum":"ChType_Illuminance",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Illuminance,
+	//chandetail:{"name":"Toggle_Inv",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Like a Toggle, but inverted states.",
+	//chandetail:"enum":"ChType_Toggle_Inv",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Toggle_Inv,
+	//chandetail:{"name":"OffOnRemember",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Radio buttons with 3 options: off, on and 'remember'. This is used for TuyaMCU memory state",
+	//chandetail:"enum":"ChType_OffOnRemember",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_OffOnRemember,
+	//chandetail:{"name":"Voltage_div100",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"For TuyaMCU power metering. Not used for BL09** and CSE** sensors. Divider is used by TuyaMCU, because TuyaMCU sends always values as integers so we have to divide them before displaying on UI",
+	//chandetail:"enum":"ChType_Voltage_div100",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Voltage_div100,
+	//chandetail:{"name":"Temperature_div2",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Just like ChType_Temperature_div10, but for multiplied by 0.5.",
+	//chandetail:"enum":"ChType_Temperature_div2",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Temperature_div2,
+	//chandetail:{"name":"TimerSeconds",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"This will display time formatted to minutes, hours, etc.",
+	//chandetail:"enum":"ChType_TimerSeconds",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_TimerSeconds,
+	//chandetail:{"name":"Frequency_div10",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"For TuyaMCU power metering. Not used for BL09** and CSE** sensors. Divider is used by TuyaMCU, because TuyaMCU sends always values as integers so we have to divide them before displaying on UI",
+	//chandetail:"enum":"ChType_Frequency_div10",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Frequency_div10,
+	//chandetail:{"name":"PowerFactor_div100",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"For TuyaMCU power metering. Not used for BL09** and CSE** sensors. Divider is used by TuyaMCU, because TuyaMCU sends always values as integers so we have to divide them before displaying on UI",
+	//chandetail:"enum":"ChType_PowerFactor_div100",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_PowerFactor_div100,
+	//chandetail:{"name":"Pressure_div100",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":".",
+	//chandetail:"enum":"Pressure_div100",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Pressure_div100,
+	//chandetail:{"name":"Temperature_div100",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Just like humidity_div100, but for temperature.",
+	//chandetail:"enum":"ChType_Temperature_div100",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Temperature_div100,
+	//chandetail:{"name":"LeakageCurrent_div1000",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":".",
+	//chandetail:"enum":"ChType_LeakageCurrent_div1000",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_LeakageCurrent_div1000,
+	//chandetail:{"name":"Power_div100",
+	//chandetail:"title":"TODO",
+	//chandetail:"descr":"Just like power, but with one decimal place (but stored as integer, for TuyaMCU support)",
+	//chandetail:"enum":"ChType_Power_div100",
+	//chandetail:"file":"new_pins.h",
+	//chandetail:"driver":""}
+	ChType_Power_div100,
 	//chandetail:{"name":"Max",
 	//chandetail:"title":"TODO",
 	//chandetail:"descr":"This is the current total number of available channel types.",
@@ -821,6 +933,8 @@ typedef enum channelType_e {
 #define PLATFORM_GPIO_MAX 17
 #elif PLATFORM_W800
 #define PLATFORM_GPIO_MAX 44
+#elif PLATFORM_LN882H
+#define PLATFORM_GPIO_MAX 26
 #else
 #define PLATFORM_GPIO_MAX 29
 #endif
@@ -926,8 +1040,14 @@ typedef struct pinsState_s {
 #define OBK_FLAG_POWER_FORCE_ZERO_IF_RELAYS_OPEN    38
 #define OBK_FLAG_MQTT_PUBLISH_ALL_CHANNELS			39
 #define OBK_FLAG_MQTT_ENERGY_IN_KWH					40
+#define OBK_FLAG_BUTTON_DISABLE_ALL					41
+#define OBK_FLAG_DOORSENSOR_INVERT_STATE			42
+#define OBK_FLAG_TUYAMCU_USE_QUEUE					43
+#define OBK_FLAG_HTTP_DISABLE_AUTH_IN_SAFE_MODE		44
+#define OBK_FLAG_DISCOVERY_DONT_MERGE_LIGHTS		45
+#define OBK_FLAG_TUYAMCU_STORE_RAW_DATA				46
 
-#define OBK_TOTAL_FLAGS 41
+#define OBK_TOTAL_FLAGS 47
 
 #define LOGGER_FLAG_MQTT_DEDUPER					1
 #define LOGGER_FLAG_POWER_SAVE						2
@@ -1102,13 +1222,23 @@ typedef struct mainConfig_s {
 	char ping_host[64];
 	// ofs 0x000005E0 (dec 1504)
 	//char initCommandLine[512];
+#if PLATFORM_W600 || PLATFORM_W800
+#define ALLOW_SSID2 0
+#define ALLOW_WEB_PASSWORD 0
+	char initCommandLine[512];
+#else
+#define ALLOW_SSID2 1
+#define ALLOW_WEB_PASSWORD 1
 	char initCommandLine[1568];
 	// offset 0x00000C00 (3072 decimal)
 	char wifi_ssid2[64];
 	// offset 0x00000C40 (3136 decimal)
 	char wifi_pass2[68];
 	// offset 0x00000C84 (3204 decimal)
-	char unused[380];
+	char webPassword[33];
+	// offset 0x00000CA5 (3237 decimal)
+	char unused[347];
+#endif
 } mainConfig_t; 
 
 // one sector is 4096 so it we still have some expand possibility
@@ -1119,13 +1249,15 @@ extern mainConfig_t g_cfg;
 
 extern char g_enable_pins;
 extern int g_initialPinStates;
-extern byte g_defaultWakeEdge;
 
 #define CHANNEL_SET_FLAG_FORCE		1
 #define CHANNEL_SET_FLAG_SKIP_MQTT	2
 #define CHANNEL_SET_FLAG_SILENT		4
 
 void PIN_ticks(void* param);
+
+void PIN_DeepSleep_SetWakeUpEdge(int pin, byte edgeCode);
+void PIN_DeepSleep_SetAllWakeUpEdges(byte edgeCode);
 
 void PIN_set_wifi_led(int value);
 void PIN_AddCommands(void);
@@ -1162,7 +1294,7 @@ bool CHANNEL_IsPowerRelayChannel(int ch);
 // See: enum channelType_t
 void CHANNEL_SetType(int ch, int type);
 int CHANNEL_GetType(int ch);
-void CHANNEL_SetAllChannelsByType(int requiredType, int newVal);
+void CHANNEL_SetFirstChannelByType(int requiredType, int newVal);
 // CHANNEL_SET_FLAG_*
 void CHANNEL_SetAll(int iVal, int iFlags);
 void CHANNEL_SetStateOnly(int iVal);
@@ -1174,6 +1306,7 @@ int CHANNEL_FindMaxValueForChannel(int ch);
 // cmd_channels.c
 const char* CHANNEL_GetLabel(int ch);
 bool CHANNEL_ShouldAddTogglePrefixToUI(int ch);
+bool CHANNEL_HasNeverPublishFlag(int ch);
 //ledRemap_t *CFG_GetLEDRemap();
 
 void PIN_get_Relay_PWM_Count(int* relayCount, int* pwmCount, int* dInputCount);
@@ -1181,6 +1314,10 @@ int h_isChannelPWM(int tg_ch);
 int h_isChannelRelay(int tg_ch);
 int h_isChannelDigitalInput(int tg_ch);
 
+const char *ChannelType_GetTitle(int type);
+const char *ChannelType_GetUnit(int type);
+int ChannelType_GetDivider(int type);
+int ChannelType_GetDecimalPlaces(int type);
 
 //int PIN_GetPWMIndexForPinIndex(int pin);
 

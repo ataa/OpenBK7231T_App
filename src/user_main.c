@@ -30,7 +30,7 @@
 #include "mqtt/new_mqtt.h"
 #include "ota/ota.h"
 
-#ifdef ENABLE_LITTLEFS
+#if ENABLE_LITTLEFS
 #include "littlefs/our_lfs.h"
 #endif
 
@@ -42,6 +42,7 @@
 #ifdef PLATFORM_BEKEN
 #include <mcu_ps.h>
 #include <fake_clock_pub.h>
+#include <BkDriverWdg.h>
 void bg_register_irda_check_func(FUNCPTR func);
 #endif
 
@@ -66,6 +67,7 @@ int bSafeMode = 0;
 // not really <time>, but rather a loop count, but it doesn't really matter much
 // start disabled.
 int g_timeSinceLastPingReply = -1;
+int g_prevTimeSinceLastPingReply = -1;
 // was it ran?
 static int g_bPingWatchDogStarted = 0;
 // current IP string, this is compared with IP returned from HAL
@@ -121,7 +123,18 @@ void extended_app_waiting_for_launch2(void) {
 }
 #endif
 
-#if defined(PLATFORM_BL602) || defined(PLATFORM_W800) || defined(PLATFORM_W600)
+
+#if defined(PLATFORM_LN882H)
+
+int LWIP_GetMaxSockets() {
+	return 0;
+}
+int LWIP_GetActiveSockets() {
+	return 0;
+}
+#endif
+
+#if defined(PLATFORM_BL602) || defined(PLATFORM_W800) || defined(PLATFORM_W600)|| defined(PLATFORM_LN882H)
 
 
 
@@ -450,8 +463,9 @@ void Main_OnEverySecond()
 	{
 		// cast event so users can script anything easily, run custom commands
 		// Usage: addChangeHandler noPingTime > 600 reboot
-		EventHandlers_ProcessVariableChange_Integer(CMD_EVENT_CHANGE_NOPINGTIME, g_timeSinceLastPingReply, g_timeSinceLastPingReply + 1);
 		g_timeSinceLastPingReply++;
+		EventHandlers_ProcessVariableChange_Integer(CMD_EVENT_CHANGE_NOPINGTIME, g_prevTimeSinceLastPingReply, g_timeSinceLastPingReply);
+		g_prevTimeSinceLastPingReply = g_timeSinceLastPingReply;
 		// this is an old mechanism that just tries to reconnect (but without reboot)
 		if (CFG_GetPingDisconnectedSecondsToRestart() > 0 && g_timeSinceLastPingReply >= CFG_GetPingDisconnectedSecondsToRestart())
 		{
@@ -778,7 +792,7 @@ void quick_timer_thread(void* param)
 		QuickTick(0);
 	}
 }
-#elif PLATFORM_XR809
+#elif PLATFORM_XR809 || PLATFORM_LN882H
 OS_Timer_t g_quick_timer;
 #else
 beken_timer_t g_quick_timer;
@@ -793,7 +807,7 @@ void QuickTick_StartThread(void)
 #elif PLATFORM_W600 || PLATFORM_W800
 
 	xTaskCreate(quick_timer_thread, "quick", 1024, NULL, 15, NULL);
-#elif PLATFORM_XR809
+#elif PLATFORM_XR809 || PLATFORM_LN882H
 
 	OS_TimerSetInvalid(&g_quick_timer);
 	if (OS_TimerCreate(&g_quick_timer, OS_TIMER_PERIODIC, QuickTick, NULL,
@@ -887,7 +901,7 @@ void Main_Init_BeforeDelay_Unsafe(bool bAutoRunScripts) {
 	PIN_AddCommands();
 	ADDLOGF_DEBUG("Initialised pins\r\n");
 
-#ifdef ENABLE_LITTLEFS
+#if ENABLE_LITTLEFS
 	// initialise the filesystem, only if present.
 	// don't create if it does not mount
 	// do this for ST mode only, as it may be something in FS which is killing us,
@@ -917,6 +931,9 @@ void Main_Init_BeforeDelay_Unsafe(bool bAutoRunScripts) {
 	// so ALL commands expected in autoexec.bat should have been registered by now...
 	// but DON't run autoexec if we have had 2+ boot failures
 	CMD_Init_Early();
+#if WINDOWS
+	CMD_InitSimulatorOnlyCommands();
+#endif
 
 	/* Automatic disable of PIN MONITOR after reboot */
 	if (CFG_HasFlag(OBK_FLAG_HTTP_PINMONITOR)) {
@@ -948,6 +965,11 @@ void Main_Init_BeforeDelay_Unsafe(bool bAutoRunScripts) {
 			if (PIN_FindPinIndexForRole(IOR_BP1658CJ_CLK, -1) != -1 && PIN_FindPinIndexForRole(IOR_BP1658CJ_DAT, -1) != -1) {
 #ifndef OBK_DISABLE_ALL_DRIVERS
 				DRV_StartDriver("BP1658CJ");
+#endif
+			}
+			if (PIN_FindPinIndexForRole(IOR_KP18058_CLK, -1) != -1 && PIN_FindPinIndexForRole(IOR_KP18058_DAT, -1) != -1) {
+#ifndef OBK_DISABLE_ALL_DRIVERS
+				DRV_StartDriver("KP18058");
 #endif
 			}
 			if (PIN_FindPinIndexForRole(IOR_BL0937_CF, -1) != -1 && PIN_FindPinIndexForRole(IOR_BL0937_CF1, -1) != -1
@@ -1055,7 +1077,7 @@ void Main_Init_Before_Delay()
 	}
 	CFG_InitAndLoad();
 
-#ifdef ENABLE_LITTLEFS
+#if ENABLE_LITTLEFS
 	LFSAddCmds();
 #endif
 

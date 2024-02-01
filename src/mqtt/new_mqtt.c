@@ -854,7 +854,14 @@ static OBK_Publish_Result MQTT_PublishTopicToClient(mqtt_client_t* client, const
 	if ((pub_topic != NULL) && (sVal != NULL))
 	{
 		sVal_len = strlen(sVal);
-		sprintf(pub_topic, "%s/%s%s", sTopic, sChannel, (appendGet == true ? "/get" : ""));
+		if (flags & OBK_PUBLISH_FLAG_RAW_TOPIC_NAME)
+		{
+			strcpy(pub_topic, sChannel);
+		}
+		else 
+		{
+			sprintf(pub_topic, "%s/%s%s", sTopic, sChannel, (appendGet == true ? "/get" : ""));
+		}
 		if (sVal_len < 128)
 		{
 			addLogAdv(LOG_INFO, LOG_FEATURE_MQTT, "Publishing val %s to %s retain=%i\n", sVal, pub_topic, retain);
@@ -1217,16 +1224,16 @@ static int MQTT_do_connect(mqtt_client_t* client)
 	return 0;
 }
 
-OBK_Publish_Result MQTT_PublishMain_StringInt(const char* sChannel, int iv)
+OBK_Publish_Result MQTT_PublishMain_StringInt(const char* sChannel, int iv, int flags)
 {
 	char valueStr[16];
 
 	sprintf(valueStr, "%i", iv);
 
-	return MQTT_PublishMain(mqtt_client, sChannel, valueStr, 0, true);
+	return MQTT_PublishMain(mqtt_client, sChannel, valueStr, flags, true);
 
 }
-OBK_Publish_Result MQTT_PublishMain_StringFloat(const char* sChannel, float f, int maxDecimalPlaces)
+OBK_Publish_Result MQTT_PublishMain_StringFloat(const char* sChannel, float f, int maxDecimalPlaces, int flags)
 {
 	char valueStr[16];
 
@@ -1236,7 +1243,7 @@ OBK_Publish_Result MQTT_PublishMain_StringFloat(const char* sChannel, float f, i
 		stripDecimalPlaces(valueStr, maxDecimalPlaces);
 	}
 
-	return MQTT_PublishMain(mqtt_client, sChannel, valueStr, 0, true);
+	return MQTT_PublishMain(mqtt_client, sChannel, valueStr, flags, true);
 
 }
 OBK_Publish_Result MQTT_PublishMain_StringString(const char* sChannel, const char* valueStr, int flags)
@@ -1250,6 +1257,11 @@ OBK_Publish_Result MQTT_ChannelPublish(int channel, int flags)
 {
 	char channelNameStr[8];
 	char valueStr[16];
+
+	// allow users to force-hide some channels (those channels are NEVER published)
+	if (CHANNEL_HasNeverPublishFlag(channel)) {
+		return OBK_PUBLISH_OK;
+	}
 
 	if (CFG_HasFlag(OBK_FLAG_PUBLISH_MULTIPLIED_VALUES)) {
 		float dVal = CHANNEL_GetFinalValue(channel);
@@ -1306,8 +1318,9 @@ commandResult_t MQTT_PublishChannel(const void* context, const char* cmd, const 
 commandResult_t MQTT_PublishCommand(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	const char* topic, * value;
 	OBK_Publish_Result ret;
+	int flags = 0;
 
-	Tokenizer_TokenizeString(args, 0);
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
 
 	if (Tokenizer_GetArgsCount() < 2) {
 		addLogAdv(LOG_INFO, LOG_FEATURE_MQTT, "Publish command requires two arguments (topic and value)");
@@ -1315,8 +1328,11 @@ commandResult_t MQTT_PublishCommand(const void* context, const char* cmd, const 
 	}
 	topic = Tokenizer_GetArg(0);
 	value = Tokenizer_GetArg(1);
-
-	ret = MQTT_PublishMain_StringString(topic, value, 0);
+	// optional third argument to remove get, etc
+	if (Tokenizer_GetArgIntegerDefault(2, 0) != 0) {
+		flags = OBK_PUBLISH_FLAG_RAW_TOPIC_NAME;
+	}
+	ret = MQTT_PublishMain_StringString(topic, value, flags);
 
 	return CMD_RES_OK;
 }
@@ -1326,6 +1342,7 @@ commandResult_t MQTT_PublishCommandInteger(const void* context, const char* cmd,
 	const char* topic;
 	int value;
 	OBK_Publish_Result ret;
+	int flags = 0;
 
 	Tokenizer_TokenizeString(args, 0);
 
@@ -1335,8 +1352,11 @@ commandResult_t MQTT_PublishCommandInteger(const void* context, const char* cmd,
 	}
 	topic = Tokenizer_GetArg(0);
 	value = Tokenizer_GetArgInteger(1);
-
-	ret = MQTT_PublishMain_StringInt(topic, value);
+	// optional third argument to remove get, etc
+	if (Tokenizer_GetArgIntegerDefault(2, 0) != 0) {
+		flags = OBK_PUBLISH_FLAG_RAW_TOPIC_NAME;
+	}
+	ret = MQTT_PublishMain_StringInt(topic, value, flags);
 
 	return CMD_RES_OK;
 }
@@ -1347,6 +1367,7 @@ commandResult_t MQTT_PublishCommandFloat(const void* context, const char* cmd, c
 	const char* topic;
 	float value;
 	OBK_Publish_Result ret;
+	int flags = 0;
 
 	Tokenizer_TokenizeString(args, 0);
 
@@ -1357,7 +1378,11 @@ commandResult_t MQTT_PublishCommandFloat(const void* context, const char* cmd, c
 	topic = Tokenizer_GetArg(0);
 	value = Tokenizer_GetArgFloat(1);
 
-	ret = MQTT_PublishMain_StringFloat(topic, value, -1);
+	// optional third argument to remove get, etc
+	if (Tokenizer_GetArgIntegerDefault(2, 0) != 0) {
+		flags = OBK_PUBLISH_FLAG_RAW_TOPIC_NAME;
+	}
+	ret = MQTT_PublishMain_StringFloat(topic, value, -1, flags);
 
 	return CMD_RES_OK;
 }
@@ -1515,7 +1540,7 @@ static void mqtt_timer_thread(void* param)
 		MQTT_Test_Tick(param);
 	}
 }
-#elif PLATFORM_XR809
+#elif PLATFORM_XR809 || PLATFORM_LN882H
 static OS_Timer_t timer;
 #else
 static beken_timer_t g_mqtt_timer;
@@ -1550,7 +1575,7 @@ commandResult_t MQTT_StartMQTTTestThread(const void* context, const char* cmd, c
 	xTaskCreate(mqtt_timer_thread, "mqtt", 1024, (void*)info, 15, NULL);
 #elif PLATFORM_W600 || PLATFORM_W800
 	xTaskCreate(mqtt_timer_thread, "mqtt", 1024, (void*)info, 15, NULL);
-#elif PLATFORM_XR809
+#elif PLATFORM_XR809 || PLATFORM_LN882H
 	OS_TimerSetInvalid(&timer);
 	if (OS_TimerCreate(&timer, OS_TIMER_PERIODIC, MQTT_Test_Tick, (void*)info, MQTT_TMR_DURATION) != OS_OK)
 	{
@@ -1653,17 +1678,17 @@ void MQTT_init()
 	mqtt_initialised = 1;
 
 	//cmddetail:{"name":"publish","args":"[Topic][Value]",
-	//cmddetail:"descr":"Publishes data by MQTT. The final topic will be obk0696FB33/[Topic]/get. You can use argument expansion here, so $CH11 will change to value of the channel 11",
+	//cmddetail:"descr":"Publishes data by MQTT. The final topic will be obk0696FB33/[Topic]/get, but you can also publish under raw topic, by adding third argument - '1'. You can use argument expansion here, so $CH11 will change to value of the channel 11",
 	//cmddetail:"fn":"MQTT_PublishCommand","file":"mqtt/new_mqtt.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("publish", MQTT_PublishCommand, NULL);
 	//cmddetail:{"name":"publishInt","args":"[Topic][Value]",
-	//cmddetail:"descr":"Publishes data by MQTT. The final topic will be obk0696FB33/[Topic]/get. You can use argument expansion here, so $CH11 will change to value of the channel 11. This version of command publishes an integer, so you can also use math expressions like $CH10*10, etc.",
+	//cmddetail:"descr":"Publishes data by MQTT. The final topic will be obk0696FB33/[Topic]/get, but you can also publish under raw topic, by adding third argument - '1'.. You can use argument expansion here, so $CH11 will change to value of the channel 11. This version of command publishes an integer, so you can also use math expressions like $CH10*10, etc.",
 	//cmddetail:"fn":"MQTT_PublishCommand","file":"mqtt/new_mqtt.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("publishInt", MQTT_PublishCommandInteger, NULL);
 	//cmddetail:{"name":"publishFloat","args":"[Topic][Value]",
-	//cmddetail:"descr":"Publishes data by MQTT. The final topic will be obk0696FB33/[Topic]/get. You can use argument expansion here, so $CH11 will change to value of the channel 11. This version of command publishes an float, so you can also use math expressions like $CH10*0.0, etc.",
+	//cmddetail:"descr":"Publishes data by MQTT. The final topic will be obk0696FB33/[Topic]/get, but you can also publish under raw topic, by adding third argument - '1'.. You can use argument expansion here, so $CH11 will change to value of the channel 11. This version of command publishes an float, so you can also use math expressions like $CH10*0.0, etc.",
 	//cmddetail:"fn":"MQTT_PublishCommand","file":"mqtt/new_mqtt.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("publishFloat", MQTT_PublishCommandFloat, NULL);

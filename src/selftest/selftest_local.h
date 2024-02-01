@@ -14,8 +14,10 @@ void SelfTest_Failed(const char *file, const char *function, int line, const cha
 	SelfTest_Failed(__FILE__, __FUNCTION__, __LINE__, #expr)
 
 #define SELFTEST_ASSERT_FLOATCOMPARE(exp, res) SELFTEST_ASSERT(Float_Equals(exp, res));
+#define SELFTEST_ASSERT_FLOATCOMPAREEPSILON(exp, res, eps) SELFTEST_ASSERT(Float_EqualsEpsilon(exp, res, eps));
 #define SELFTEST_ASSERT_EXPRESSION(exp, res) SELFTEST_ASSERT(Float_Equals(CMD_EvaluateExpression(exp,0), res));
 #define SELFTEST_ASSERT_CHANNEL(channelIndex, res) SELFTEST_ASSERT(Float_Equals(CHANNEL_Get(channelIndex), res));
+#define SELFTEST_ASSERT_CHANNELEPSILON(channelIndex, res, marg) SELFTEST_ASSERT(Float_EqualsEpsilon(CHANNEL_Get(channelIndex), res, marg));
 #define SELFTEST_ASSERT_CHANNELTYPE(channelIndex, res) SELFTEST_ASSERT(CHANNEL_GetType(channelIndex)==res);
 #define SELFTEST_ASSERT_PIN_BOOLEAN(pinIndex, res) SELFTEST_ASSERT((SIM_GetSimulatedPinValue(pinIndex)== res));
 #define SELFTEST_ASSERT_ARGUMENT(argumentIndex, res) SELFTEST_ASSERT(!strcmp(Tokenizer_GetArg(argumentIndex), res));
@@ -27,6 +29,9 @@ void SelfTest_Failed(const char *file, const char *function, int line, const cha
 #define SELFTEST_ASSERT_JSON_VALUE_INTEGER_NESTED2(par1, par2, varName, res) SELFTEST_ASSERT((Test_GetJSONValue_Integer_Nested2(par1, par2,varName) == res));
 #define SELFTEST_ASSERT_JSON_VALUE_FLOAT_NESTED2(par1, par2, varName, res) SELFTEST_ASSERT((Float_Equals(Test_GetJSONValue_Float_Nested2(par1, par2,varName),res)));
 #define SELFTEST_ASSERT_JSON_VALUE_STRING_NESTED2(par1, par2, varName, res) SELFTEST_ASSERT((!strcmp(Test_GetJSONValue_String_Nested2(par1, par2,varName),res)));
+#define SELFTEST_ASSERT_HAS_MQTT_ARRAY_ITEM_INT(index, key, valInt) SELFTEST_ASSERT((Test_GetJSONValue_IntFromArray(index,key)==valInt));
+#define SELFTEST_ASSERT_HAS_MQTT_ARRAY_ITEM_STR(index, key, valInt) SELFTEST_ASSERT((!strcmp(Test_GetJSONValue_StrFromArray(index,key),valInt)));
+
 #define SELFTEST_ASSERT_STRING(current,expected) SELFTEST_ASSERT((strcmp(expected,current) == 0));
 #define SELFTEST_ASSERT_INTEGER(current,expected) SELFTEST_ASSERT((expected==current));
 #define SELFTEST_ASSERT_HTML_REPLY(expected) SELFTEST_ASSERT((strcmp(Test_GetLastHTMLReply(),expected) == 0));
@@ -42,6 +47,10 @@ void SelfTest_Failed(const char *file, const char *function, int line, const cha
 inline bool Float_Equals(float a, float b) {
 	float res = fabs(a - b);
 	return res < 0.001f;
+}
+inline bool Float_EqualsEpsilon(float a, float b, float epsilon) {
+	float res = fabs(a - b);
+	return res < epsilon;
 }
 
 #define VA_BUFFER_SIZE 4096
@@ -62,7 +71,7 @@ inline const char *va(const char *fmt, ...) {
 	return p;
 }
 
-
+void Test_Battery();
 void Test_Flash_Search();
 void Test_JSON_Lib();
 void Test_Commands_Startup();
@@ -71,6 +80,7 @@ void Test_ClockEvents();
 void Test_Commands_Channels();
 void Test_LEDDriver();
 void Test_TuyaMCU_Basic();
+void Test_TuyaMCU_RawAccess();
 void Test_Command_If();
 void Test_Command_If_Else();
 void Test_LFS();
@@ -82,6 +92,7 @@ void Test_RepeatingEvents();
 void Test_HTTP_Client();
 void Test_DeviceGroups();
 void Test_NTP();
+void Test_NTP_SunsetSunrise();
 void Test_MQTT();
 void Test_Tasmota();
 void Test_EnergyMeter();
@@ -99,6 +110,8 @@ void Test_Role_ToggleAll();
 void Test_Demo_SimpleShuttersScript();
 void Test_Commands_Generic();
 void Test_ChangeHandlers_MQTT();
+void Test_ChangeHandlers();
+void Test_ChangeHandlers_EnsureThatChannelVariableIsExpandedAtHandlerRunTime();
 void Test_Commands_Calendar();
 void Test_CFG_Via_HTTP();
 void Test_Demo_ButtonScrollingChannelValues();
@@ -108,6 +121,7 @@ void Test_WaitFor();
 void Test_IF_Inside_Backlog();
 void Test_MQTT_Get_LED_EnableAll();
 void Test_TuyaMCU_BatteryPowered();
+void Test_ChargeLimitDriver();
 
 void Test_GetJSONValue_Setup(const char *text);
 void Test_FakeHTTPClientPacket_GET(const char *tg);
@@ -126,6 +140,8 @@ int Test_GetJSONValue_Integer(const char *keyword, const char *obj);
 const char *Test_GetJSONValue_String(const char *keyword, const char *obj);
 const char *Test_GetJSONValue_String_Nested(const char *par1, const char *keyword);
 const char *Test_GetJSONValue_String_Nested2(const char *par1, const char *par2, const char *keyword);
+int Test_GetJSONValue_IntFromArray(int index, const char *obj);
+const char *Test_GetJSONValue_StrFromArray(int index, const char *obj);
 
 void SIM_SendFakeMQTT(const char *text, const char *arguments);
 void SIM_SendFakeMQTTAndRunSimFrame_CMND(const char *command, const char *arguments);
@@ -144,7 +160,7 @@ void SIM_SimulateUserClickOnPin(int pin);
 // simulated UART
 void SIM_UART_InitReceiveRingBuffer(int size);
 int SIM_UART_GetDataSize();
-byte SIM_UART_GetNextByte(int index);
+byte SIM_UART_GetByte(int index);
 void SIM_UART_ConsumeBytes(int idx);
 void SIM_AppendUARTByte(byte rc);
 bool SIM_UART_ExpectAndConsumeHByte(byte b);

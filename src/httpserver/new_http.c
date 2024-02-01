@@ -9,6 +9,8 @@
 #include "../new_cfg.h"
 #include "../ota/ota.h"
 #include "../hal/hal_wifi.h"
+#include "../base64/base64.h"
+#include "http_basic_auth.h"
 
 
 // define the feature ADDLOGF_XXX will use
@@ -77,13 +79,14 @@ typedef struct http_callback_tag {
 	char* url;
 	int method;
 	http_callback_fn callback;
+	int auth_required;
 } http_callback_t;
 
 #define MAX_HTTP_CALLBACKS 32
 static http_callback_t* callbacks[MAX_HTTP_CALLBACKS];
 static int numCallbacks = 0;
 
-int HTTP_RegisterCallback(const char* url, int method, http_callback_fn callback) {
+int HTTP_RegisterCallback(const char* url, int method, http_callback_fn callback, int auth_required) {
 	int i;
 
 	if (!url || !callback) {
@@ -112,6 +115,7 @@ int HTTP_RegisterCallback(const char* url, int method, http_callback_fn callback
 	strcpy(callbacks[numCallbacks]->url, url);
 	callbacks[numCallbacks]->callback = callback;
 	callbacks[numCallbacks]->method = method;
+	callbacks[numCallbacks]->auth_required = auth_required > 0 ? 1 : 0;
 
 	numCallbacks++;
 
@@ -351,14 +355,9 @@ int http_copyCarg(const char* atin, char* to, int maxSize) {
 	return realSize;
 }
 
-int http_getArg(const char* base, const char* name, char* o, int maxSize) {
+int http_getRawArg(const char* base, const char* name, char* o, int maxSize) {
 	*o = '\0';
-	while (*base != '?') {
-		if (*base == 0)
-			return 0;
-		base++;
-	}
-	base++;
+
 	while (*base) {
 		const char* at = http_checkArg(base, name);
 		if (at) {
@@ -374,6 +373,17 @@ int http_getArg(const char* base, const char* name, char* o, int maxSize) {
 		base++;
 	}
 	return 0;
+}
+int http_getArg(const char* base, const char* name, char* o, int maxSize) {
+	*o = '\0';
+	while (*base != '?') {
+		if (*base == '\0')
+			return 0;
+		base++;
+	}
+	base++;
+
+	return http_getRawArg(base, name, o, maxSize);
 }
 int http_getArgInteger(const char* base, const char* name) {
 	char tmp[16];
@@ -458,6 +468,10 @@ const char* htmlPinRoleNames[] = {
 	"TM1638_CLK",
 	"TM1638_DAT",
 	"TM1638_STB",
+	"BAT_Relay_n",
+	"KP18058_CLK",
+	"KP18058_DAT",
+	"error",
 	"error",
 	"error",
 	"error",
@@ -573,6 +587,7 @@ int hprintf255(http_request_t* request, const char* fmt, ...) {
 	return postany(request, tmp, strlen(tmp));
 }
 
+int HUE_APICall(http_request_t* request);
 
 int HTTP_ProcessPacket(http_request_t* request) {
 	int i;
@@ -698,16 +713,30 @@ int HTTP_ProcessPacket(http_request_t* request) {
 	return http_fn_empty_url(request);
 #endif
 
+#if ENABLE_DRIVER_HUE
+	if (HUE_APICall(request)) {
+		return 0;
+	}
+#endif
+
 	// look for a callback with this URL and method, or HTTP_ANY
 	for (i = 0; i < numCallbacks; i++) {
 		char* url = callbacks[i]->url;
 		if (http_startsWith(urlStr, &url[1])) {
 			int method = callbacks[i]->method;
 			if (method == HTTP_ANY || method == request->method) {
+				if (callbacks[i]->auth_required > 0 && http_basic_auth_run(request) == HTTP_BASIC_AUTH_FAIL) {
+					return 0;
+				}
 				return callbacks[i]->callback(request);
 			}
 		}
 	}
+
+	if (http_basic_auth_run(request) == HTTP_BASIC_AUTH_FAIL) {
+		return 0;
+	}
+
 	if (http_checkUrlBase(urlStr, "")) return http_fn_empty_url(request);
 
 	if (http_checkUrlBase(urlStr, "testmsg")) return http_fn_testmsg(request);

@@ -8,7 +8,7 @@
 #include "hal/hal_wifi.h"
 #include "hal/hal_flashConfig.h"
 #include "cmnds/cmd_public.h"
-#ifdef ENABLE_LITTLEFS
+#if ENABLE_LITTLEFS
 #include "littlefs/our_lfs.h"
 #endif
 
@@ -26,7 +26,11 @@ int g_cfg_pendingChanges = 0;
 #define MAIN_CFG_VERSION_V3 3
 // version 4 - bumped size by 1024,
 // added alternate ssid fields
-#define MAIN_CFG_VERSION 4
+#if PLATFORM_W600
+#define MAIN_CFG_VERSION 3
+#else
+#define MAIN_CFG_VERSION 5
+#endif
 
 static byte CFG_CalcChecksum(mainConfig_t *inf) {
 	int header_size;
@@ -38,11 +42,14 @@ static byte CFG_CalcChecksum(mainConfig_t *inf) {
 
 	if (inf->version == MAIN_CFG_VERSION_V3) {
 		configSize = MAGIC_CONFIG_SIZE_V3;
+#if ALLOW_SSID2
 		// quick fix for converting
 		inf->wifi_pass2[0] = 0;
 		inf->wifi_ssid2[0] = 0;
+#endif
 	}
-	else {
+	else
+	{
 		configSize = sizeof(mainConfig_t);
 	}
 	remaining_size = configSize - header_size;
@@ -280,6 +287,7 @@ int CFG_GetMQTTPort() {
 	return g_cfg.mqtt_port;
 }
 void CFG_SetShortDeviceName(const char *s) {
+
 	// this will return non-zero if there were any changes
 	if(strcpy_safe_checkForChanges(g_cfg.shortDeviceName, s,sizeof(g_cfg.shortDeviceName))) {
 		// mark as dirty (value has changed)
@@ -322,10 +330,18 @@ const char *CFG_GetWiFiPass(){
 	return wifi_pass;
 }
 const char *CFG_GetWiFiSSID2() {
+#if ALLOW_SSID2
 	return g_cfg.wifi_ssid2;
+#else
+	return "";
+#endif
 }
 const char *CFG_GetWiFiPass2() {
+#if ALLOW_SSID2
 	return g_cfg.wifi_pass2;
+#else
+	return "";
+#endif
 }
 int CFG_SetWiFiSSID(const char *s) {
 	// this will return non-zero if there were any changes
@@ -351,20 +367,24 @@ int CFG_SetWiFiPass(const char *s) {
 	return 0;
 }
 int CFG_SetWiFiSSID2(const char *s) {
+#if ALLOW_SSID2
 	// this will return non-zero if there were any changes
 	if (strcpy_safe_checkForChanges(g_cfg.wifi_ssid2, s, sizeof(g_cfg.wifi_ssid2))) {
 		// mark as dirty (value has changed)
 		g_cfg_pendingChanges++;
 		return 1;
 	}
+#endif
 	return 0;
 }
 int CFG_SetWiFiPass2(const char *s) {
+#if ALLOW_SSID2
 	if (strcpy_safe_checkForChanges(g_cfg.wifi_pass2, s, sizeof(g_cfg.wifi_pass2))) {
 		// mark as dirty (value has changed)
 		g_cfg_pendingChanges++;
 		return 1;
 	}
+#endif
 	return 0;
 }
 const char *CFG_GetMQTTHost() {
@@ -537,6 +557,9 @@ bool CFG_HasLoggerFlag(int flag) {
 int CFG_GetFlags() {
 	return g_cfg.genericFlags;
 }
+unsigned long CFG_GetFlags64() {
+	return *((unsigned long*)&g_cfg.genericFlags);
+}
 bool CFG_HasFlag(int flag) {
 	if (flag >= 32) {
 		flag -= 32;
@@ -647,8 +670,25 @@ void CFG_SetButtonRepeatPressTime(int value) {
 		g_cfg_pendingChanges++;
 	}
 }
+const char *CFG_GetWebPassword() {
+#if ALLOW_WEB_PASSWORD
+	return g_cfg.webPassword;
+#else
+	return "";
+#endif
+}
+void CFG_SetWebPassword(const char *s) {
+#if ALLOW_WEB_PASSWORD
+	// this will return non-zero if there were any changes
+	if(strcpy_safe_checkForChanges(g_cfg.webPassword, s,sizeof(g_cfg.webPassword))) {
+		// mark as dirty (value has changed)
+		g_cfg_pendingChanges++;
+	}
+#endif
+}
 
-#ifdef ENABLE_LITTLEFS
+
+#if ENABLE_LITTLEFS
 void CFG_SetLFS_Size(uint32_t value) {
 	if(g_cfg.LFS_Size != value) {
 		g_cfg.LFS_Size = value;
@@ -692,6 +732,12 @@ void CFG_InitAndLoad() {
 		strcpy_safe(g_cfg.mqtt_clientId, g_cfg.shortDeviceName, sizeof(g_cfg.mqtt_clientId));
 		g_cfg_pendingChanges++;
 	}
+#if ALLOW_WEB_PASSWORD
+	// add web admin password configuration
+	if (g_cfg.version<5) {
+		strcpy_safe(g_cfg.webPassword, "", sizeof(g_cfg.webPassword));
+	}
+#endif
 	g_cfg.version = MAIN_CFG_VERSION;
 
 	if(g_cfg.buttonHoldRepeat == 0) {

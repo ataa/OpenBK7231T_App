@@ -13,7 +13,7 @@
 int cmd_uartInitIndex = 0;
 
 
-#ifdef ENABLE_LITTLEFS
+#if ENABLE_LITTLEFS
 #include "../littlefs/our_lfs.h"
 #endif
 #ifdef PLATFORM_BL602
@@ -297,6 +297,26 @@ static commandResult_t CMD_StartupCommand(const void* context, const char* cmd, 
 
 	return CMD_RES_OK;
 }
+static commandResult_t CMD_Choice(const void* context, const char* cmd, const char* args, int cmdFlags) {
+	int indexToUse;
+	const char *cmdToUse;
+
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES);
+
+	// following check must be done after 'Tokenizer_TokenizeString',
+	// so we know arguments count in Tokenizer. 'cmd' argument is
+	// only for warning display
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 2)) {
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	indexToUse = Tokenizer_GetArgInteger(0);
+	cmdToUse = Tokenizer_GetArg(1+indexToUse);
+
+	CMD_ExecuteCommand(cmdToUse, cmdFlags);
+
+
+	return CMD_RES_OK;
+}
 static commandResult_t CMD_PingHost(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	Tokenizer_TokenizeString(args, 0);
 
@@ -352,12 +372,20 @@ static commandResult_t CMD_OpenAP(const void* context, const char* cmd, const ch
 }
 static commandResult_t CMD_SafeMode(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	int i;
+	int startSaveModeIn;
+
+	Tokenizer_TokenizeString(args, 0);
+
+	startSaveModeIn = Tokenizer_GetArgIntegerDefault(0, 1);
 
 	// simulate enough boots so the reboot will go into safe mode
 	for (i = 0; i <= RESTARTS_REQUIRED_FOR_SAFE_MODE; i++) {
 		HAL_FlashVars_IncreaseBootCount();
 	}
-	RESET_ScheduleModuleReset(3);
+	if (startSaveModeIn <= 0) {
+		startSaveModeIn = 1;
+	}
+	RESET_ScheduleModuleReset(startSaveModeIn);
 
 	return CMD_RES_OK;
 }
@@ -366,7 +394,7 @@ static commandResult_t CMD_SafeMode(const void* context, const char* cmd, const 
 
 void CMD_UARTConsole_Init() {
 #if PLATFORM_BEKEN
-	UART_InitUART(115200);
+	UART_InitUART(115200, 0);
 	cmd_uartInitIndex = g_uart_init_counter;
 	UART_InitReceiveRingBuffer(512);
 #endif
@@ -380,7 +408,7 @@ void CMD_UARTConsole_Run() {
 
 	totalSize = UART_GetDataSize();
 	while (totalSize) {
-		a = UART_GetNextByte(0);
+		a = UART_GetByte(0);
 		if (a == '\n' || a == '\r' || a == ' ' || a == '\t') {
 			UART_ConsumeBytes(1);
 			totalSize = UART_GetDataSize();
@@ -394,7 +422,7 @@ void CMD_UARTConsole_Run() {
 	}
 	// skip garbage data (should not happen)
 	for (i = 0; i < totalSize; i++) {
-		a = UART_GetNextByte(i);
+		a = UART_GetByte(i);
 		if (i + 1 < sizeof(tmp)) {
 			tmp[i] = a;
 			tmp[i + 1] = 0;
@@ -578,8 +606,15 @@ commandResult_t CMD_DeepSleep_SetEdge(const void* context, const char* cmd, cons
 	{
 		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
 	}
-
-	g_defaultWakeEdge = Tokenizer_GetArgInteger(0);
+	// strlen("DSEdge") == 6
+	if (Tokenizer_GetArgsCount() > 1) {
+		// DSEdge [Edge] [Pin]
+		PIN_DeepSleep_SetWakeUpEdge(Tokenizer_GetArgInteger(1),Tokenizer_GetArgInteger(0));
+	}
+	else {
+		// DSEdge [Edge]
+		PIN_DeepSleep_SetAllWakeUpEdges(Tokenizer_GetArgInteger(0));
+	}
 
 	return CMD_RES_OK;
 }
@@ -685,13 +720,13 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_OpenAP","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("OpenAP", CMD_OpenAP, NULL);
-	//cmddetail:{"name":"DSEdge","args":"[edgeCode]",
-	//cmddetail:"descr":"DoorSensor driver configuration command. 0 means always wake up on rising edge, 1 means on falling, 2 means if state is high, use falling edge, if low, use rising. Default is 2",
+	//cmddetail:{"name":"DSEdge","args":"[edgeCode][optionalPinIndex]",
+	//cmddetail:"descr":"DeepSleep (PinDeepSleep) wake configuration command. 0 means always wake up on rising edge, 1 means on falling, 2 means if state is high, use falling edge, if low, use rising. Default is 2. Second argument is optional and allows to set per-pin DSEdge instead of setting it for all pins.",
 	//cmddetail:"fn":"CMD_DeepSleep_SetEdge","file":"drv/drv_doorSensorWithDeepSleep.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("DSEdge", CMD_DeepSleep_SetEdge, NULL);
-	//cmddetail:{"name":"SafeMode","args":"",
-	//cmddetail:"descr":"Forces device reboot into safe mode (open ap with disabled drivers)",
+	//cmddetail:{"name":"SafeMode","args":"[OptionalDelayBeforeRestart]",
+	//cmddetail:"descr":"Forces device reboot into safe mode (open ap with disabled drivers). Argument is a delay to restart in seconds, optional, minimal delay is 1",
 	//cmddetail:"fn":"CMD_SafeMode","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("SafeMode", CMD_SafeMode, NULL);
@@ -710,6 +745,11 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_StartupCommand","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("StartupCommand", CMD_StartupCommand, NULL);
+	//cmddetail:{"name":"Choice","args":"[IndexToExecute][Option0][Option1][Option2][OptionN][etc]",
+	//cmddetail:"descr":"This will choose a given argument by index and execute it as a command. Index to execute can be a variable like $CH1.",
+	//cmddetail:"fn":"NULL);","file":"cmnds/cmd_main.c","requires":"",
+	//cmddetail:"examples":""}
+	CMD_RegisterCommand("Choice", CMD_Choice, NULL);
 	//CMD_RegisterCommand("FindPattern", CMD_FindPattern, NULL);
 	
 #if (defined WINDOWS) || (defined PLATFORM_BEKEN)

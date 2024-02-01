@@ -25,6 +25,8 @@ typedef enum {
 	LIGHT_RGBCW,
 
 	/// @brief Power sensors (voltage, current, power)
+	VCP_SENSOR,
+
 	POWER_SENSOR,
 
 	/// @Brief Binary Sensor
@@ -58,7 +60,17 @@ typedef enum {
 	/// @brief 
 	CUSTOM_SENSOR,
 	/// @brief 
+	SMOKE_SENSOR,
+	/// @brief 
 	READONLYLOWMIDHIGH_SENSOR,
+	// lx unit
+	ILLUMINANCE_SENSOR,
+	// dBm unit
+	HASS_RSSI,
+	ENERGY_SENSOR,
+	// hPa
+	PRESSURE_SENSOR,
+
 } ENTITY_TYPE;
 
 //unique_id is defined in hass_populate_unique_id and is based on CFG_GetDeviceName() whose size is CGF_DEVICE_NAME_SIZE.
@@ -84,14 +96,14 @@ typedef struct HassDeviceInfo_s {
 } HassDeviceInfo;
 
 void hass_print_unique_id(http_request_t* request, const char* fmt, ENTITY_TYPE type, int index);
-HassDeviceInfo* hass_init_relay_device_info(int index, ENTITY_TYPE type);
-HassDeviceInfo* hass_init_device_info(ENTITY_TYPE type, int index, char* payload_on, char* payload_off);
+HassDeviceInfo* hass_init_relay_device_info(int index, ENTITY_TYPE type, bool bInverse);
+HassDeviceInfo* hass_init_device_info(ENTITY_TYPE type, int index, const char* payload_on, const char* payload_off);
 HassDeviceInfo* hass_init_light_device_info(ENTITY_TYPE type);
 HassDeviceInfo* hass_init_power_sensor_device_info(int index);
 HassDeviceInfo* hass_init_light_singleColor_onChannels(int toggle, int dimmer, int brightness_scale);
 HassDeviceInfo* hass_init_binary_sensor_device_info(int index, bool bInverse);
-HassDeviceInfo* hass_init_sensor_device_info(ENTITY_TYPE type, int channel, int decPlaces, int decOffset);
+HassDeviceInfo* hass_init_sensor_device_info(ENTITY_TYPE type, int channel, int decPlaces, int decOffset, int divider);
 const char* hass_build_discovery_json(HassDeviceInfo* info);
 void hass_free_device_info(HassDeviceInfo* info); 
-char *hass_generate_multiplyAndRound_template(int decimalPlacesForRounding, int decimalPointOffset);
+char *hass_generate_multiplyAndRound_template(int decimalPlacesForRounding, int decimalPointOffset, int divider);
 

@@ -14,7 +14,7 @@
 #include "../cJSON/cJSON.h"
 #include <string.h>
 #include <math.h>
-#ifdef ENABLE_LITTLEFS
+#if ENABLE_LITTLEFS
 	#include "../littlefs/our_lfs.h"
 #endif
 
@@ -105,11 +105,44 @@ void LED_ResetGlobalVariablesToDefaults() {
 	led_temperature_current = HASS_TEMPERATURE_MIN;
 }
 
+// The color order is RGBCW.
+// some people set RED to channel 0, and some of them set RED to channel 1
+// Let's detect if there is a PWM on channel 0
+int LED_GetFirstChannelIndex() {
+#if 0
+	int firstChannelIndex;
+	if (CHANNEL_HasChannelPinWithRoleOrRole(0, IOR_PWM, IOR_PWM_n)) {
+		firstChannelIndex = 0;
+	}
+	else {
+		firstChannelIndex = 1;
+	}
+	return firstChannelIndex;
+#else
+	int i;
+	for (i = 0; i < 5; i++) {
+		if (CHANNEL_HasChannelPinWithRoleOrRole(i, IOR_PWM, IOR_PWM_n)) {
+			return i;
+		}
+	}
+	return 0;
+#endif
+}
+
 bool LED_IsLedDriverChipRunning()
 {
+#ifndef PLATFORM_W600
+#ifndef OBK_DISABLE_ALL_DRIVERS
+	if (TuyaMCU_IsLEDRunning()) {
+		return true;
+	}
+#endif
+#endif
 #ifndef OBK_DISABLE_ALL_DRIVERS
 	return DRV_IsRunning("SM2135") || DRV_IsRunning("BP5758D") 
-		|| DRV_IsRunning("TESTLED") || DRV_IsRunning("SM2235") || DRV_IsRunning("BP1658CJ");
+		|| DRV_IsRunning("TESTLED") || DRV_IsRunning("SM2235") || DRV_IsRunning("BP1658CJ")
+		|| DRV_IsRunning("KP18058")
+		;
 #else
 	return false;
 #endif
@@ -253,6 +286,9 @@ void LED_I2CDriver_WriteRGBCW(float* finalRGBCW) {
 	if (DRV_IsRunning("SM2235")) {
 		SM2235_Write(finalRGBCW);
 	}
+	if (DRV_IsRunning("KP18058")) {
+		KP18058_Write(finalRGBCW);
+	}
 #endif
 }
 void LED_RunOnEverySecond() {
@@ -298,14 +334,8 @@ void LED_RunQuickColorLerp(int deltaMS) {
 
 	deltaSeconds = deltaMS * 0.001f;
 
-	// The color order is RGBCW.
-	// some people set RED to channel 0, and some of them set RED to channel 1
-	// Let's detect if there is a PWM on channel 0
-	if(CHANNEL_HasChannelPinWithRoleOrRole(0, IOR_PWM, IOR_PWM_n)) {
-		firstChannelIndex = 0;
-	} else {
-		firstChannelIndex = 1;
-	}
+	firstChannelIndex = LED_GetFirstChannelIndex();
+
 	if (CFG_HasFlag(OBK_FLAG_LED_EMULATE_COOL_WITH_RGB)) {
 		emulatedCool = firstChannelIndex + 3;
 	}
@@ -422,14 +452,8 @@ void apply_smart_light() {
 	int value_brightness = 0;
 	int value_cold_or_warm = 0;
 
-	// The color order is RGBCW.
-	// some people set RED to channel 0, and some of them set RED to channel 1
-	// Let's detect if there is a PWM on channel 0
-	if(CHANNEL_HasChannelPinWithRoleOrRole(0, IOR_PWM, IOR_PWM_n)) {
-		firstChannelIndex = 0;
-	} else {
-		firstChannelIndex = 1;
-	}
+
+	firstChannelIndex = LED_GetFirstChannelIndex();
 
 	if (CFG_HasFlag(OBK_FLAG_LED_EMULATE_COOL_WITH_RGB)) {
 		emulatedCool = firstChannelIndex + 3;
@@ -552,7 +576,12 @@ void apply_smart_light() {
 #ifndef OBK_DISABLE_ALL_DRIVERS
 	DRV_DGR_OnLedFinalColorsChange(baseRGBCW);
 #endif
-
+#ifndef PLATFORM_W600
+#ifndef OBK_DISABLE_ALL_DRIVERS
+	TuyaMCU_OnRGBCWChange(finalColors, g_lightEnableAll, g_lightMode, g_brightness0to100*0.01f, LED_GetTemperature0to1Range());
+#endif
+#endif
+	
 	// I am not sure if it's the best place to do it
 	// NOTE: this will broadcast MQTT only if a flag is set
 	sendFullRGBCW_IfEnabled();
@@ -1005,6 +1034,9 @@ void LED_NextDimmerHold() {
 	// the dimmer is 0 and anyColor * 0 gives 0)
 	LED_AddDimmer(led_defaultDimmerDeltaForHold, 1, 2);
 }
+void LED_SetDimmerForDisplayOnly(int iVal) {
+	g_brightness0to100 = iVal;
+}
 void LED_SetDimmer(int iVal) {
 
 	g_brightness0to100 = iVal;
@@ -1124,10 +1156,10 @@ void LED_GetFinalChannels100(byte *rgbcw) {
 	rgbcw[3] = finalColors[3] * (100.0f / 255.0f);
 	rgbcw[4] = finalColors[4] * (100.0f / 255.0f);
 }
-void LED_GetFinalHSV(int *hsv) {
+void LED_GetTasmotaHSV(int *hsv) {
 	hsv[0] = g_hsv_h;
-	hsv[1] = g_hsv_s;
-	hsv[2] = g_hsv_v;
+	hsv[1] = g_hsv_s * 100;
+	hsv[2] = g_hsv_v * 100;
 }
 void LED_GetFinalRGBCW(byte *rgbcw) {
 	rgbcw[0] = finalColors[0];
@@ -1511,6 +1543,9 @@ static commandResult_t setHue(const void *context, const char *cmd, const char *
 float LED_GetHue() {
 	return g_hsv_h;
 }
+
+commandResult_t commandSetPaletteColor(const void *context, const char *cmd, const char *args, int cmdFlags);
+
 void NewLED_InitCommands(){
 	int pwmCount;
 
@@ -1655,6 +1690,11 @@ void NewLED_InitCommands(){
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("led_saveInterval", cmdSaveStateIfModifiedInterval, NULL);
 
+	//cmddetail:{"name":"SPC","args":"[Index][RGB]",
+	//cmddetail:"descr":"Sets Palette Color by index.",
+	//cmddetail:"fn":"commandSetPaletteColor","file":"cmnds/cmd_newLEDDriver.c","requires":"",
+	//cmddetail:"examples":""}
+	CMD_RegisterCommand("SPC", commandSetPaletteColor, NULL);
 	
 }
 

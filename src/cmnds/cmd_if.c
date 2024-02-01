@@ -5,6 +5,7 @@
 #include "../new_pins.h"
 #include "../new_cfg.h"
 #include "../driver/drv_public.h"
+#include "../driver/drv_battery.h"
 #include "../driver/drv_ntp.h"
 #include <ctype.h> // isspace
 
@@ -160,6 +161,10 @@ float getChannelValue(const char *s) {
 	int idx = atoi(s + 3);
 	return CHANNEL_Get(idx);
 }
+float getFlagValue(const char *s) {
+	int idx = atoi(s + 5);
+	return CFG_HasFlag(idx);
+}
 
 float getLedDimmer(const char *s) {
 	return LED_GetDimmer();
@@ -202,6 +207,14 @@ float getActiveRepeatingEvents(const char *s) {
 float getVoltage(const char *s) {
 	return DRV_GetReading(OBK_VOLTAGE);
 }
+#ifdef ENABLE_DRIVER_BATTERY
+float getBatteryVoltage(const char *s) {
+	return Battery_lastreading(OBK_BATT_VOLTAGE);
+}
+float getBatteryLevel(const char *s) {
+	return Battery_lastreading(OBK_BATT_LEVEL);
+}
+#endif
 
 float getCurrent(const char *s) {
 	return DRV_GetReading(OBK_CURRENT);
@@ -210,6 +223,10 @@ float getCurrent(const char *s) {
 float getPower(const char *s) {
 	return DRV_GetReading(OBK_POWER);
 }
+float getEnergy(const char *s) {
+	return DRV_GetReading(OBK_CONSUMPTION_TOTAL);
+}
+
 
 float getNTPOn(const char *s) {
 	return NTP_IsTimeSynced();
@@ -235,6 +252,26 @@ float getHour(const char *s) {
 float getSecond(const char *s) {
 	return NTP_GetSecond();
 }
+float getYear(const char *s) {
+	return NTP_GetYear();
+}
+float getMonth(const char *s) {
+	return NTP_GetMonth();
+}
+float getMDay(const char *s) {
+	return NTP_GetMDay();
+}
+
+#if ENABLE_NTP_SUNRISE_SUNSET
+
+float getSunrise(const char *s) {
+	return NTP_GetSunrise();
+}
+float getSunset(const char *s) {
+	return NTP_GetSunset();
+}
+
+#endif
 
 const constant_t g_constants[] = {
 	//cnstdetail:{"name":"MQTTOn",
@@ -262,6 +299,16 @@ const constant_t g_constants[] = {
 	//cnstdetail:"descr":"Provides channel access, as above.",
 	//cnstdetail:"requires":""}
 	{"$CH*", &getChannelValue},
+	//cnstdetail:{"name":"$FLAG**",
+	//cnstdetail:"title":"$FLAG**",
+	//cnstdetail:"descr":"Provides flag access, as above.",
+	//cnstdetail:"requires":""}
+	{"$FLAG**", &getFlagValue},
+	//cnstdetail:{"name":"$FLAG*",
+	//cnstdetail:"title":"$FLAG*",
+	//cnstdetail:"descr":"Provides flag access, as above.",
+	//cnstdetail:"requires":""}
+	{"$FLAG*", &getFlagValue},
 	//cnstdetail:{"name":"$led_dimmer",
 	//cnstdetail:"title":"$led_dimmer",
 	//cnstdetail:"descr":"Current value of LED dimmer, 0-100 range",
@@ -323,6 +370,11 @@ const constant_t g_constants[] = {
 	//cnstdetail:"descr":"Current value of power from energy metering chip",
 	//cnstdetail:"requires":""}
 	{"$power", &getPower},
+	//cnstdetail:{"name":"$energy",
+	//cnstdetail:"title":"$energy",
+	//cnstdetail:"descr":"Current value of energy counter from energy metering chip",
+	//cnstdetail:"requires":""}
+	{"$energy", &getEnergy},
 	//cnstdetail:{"name":"$day",
 	//cnstdetail:"title":"$day",
 	//cnstdetail:"descr":"Current weekday from NTP",
@@ -343,11 +395,50 @@ const constant_t g_constants[] = {
 	//cnstdetail:"descr":"Current second from NTP",
 	//cnstdetail:"requires":""}
 	{ "$second", &getSecond },
+	////cnstdetail:{"name":"$mday",
+	////cnstdetail:"title":"$mday",
+	////cnstdetail:"descr":"Current mday from NTP",
+	////cnstdetail:"requires":""}
+	{ "$mday", &getMDay },
+	////cnstdetail:{"name":"$month",
+	////cnstdetail:"title":"$month",
+	////cnstdetail:"descr":"Current month from NTP",
+	////cnstdetail:"requires":""}
+	{ "$month", &getMonth },
+	////cnstdetail:{"name":"$year",
+	////cnstdetail:"title":"$year",
+	////cnstdetail:"descr":"Current Year from NTP",
+	////cnstdetail:"requires":""}
+	{ "$year", &getYear },
+#if ENABLE_NTP_SUNRISE_SUNSET
+	////cnstdetail:{"name":"$sunrise",
+	////cnstdetail:"title":"$sunrise",
+	////cnstdetail:"descr":"Next sunrise as a TimerSeconds from midnight",
+	////cnstdetail:"requires":""}
+	{ "$sunrise", &getSunrise },
+	////cnstdetail:{"name":"$sunset",
+	////cnstdetail:"title":"$sunset",
+	////cnstdetail:"descr":"Next sunset as a TimerSeconds from midnight",
+	////cnstdetail:"requires":""}
+	{ "$sunset", &getSunset },
+#endif
 	//cnstdetail:{"name":"$NTPOn",
 	//cnstdetail:"title":"$NTPOn",
 	//cnstdetail:"descr":"Returns 1 if NTP is on and already synced (so device has correct time), otherwise 0.",
 	//cnstdetail:"requires":""}
 	{ "$NTPOn", &getNTPOn },
+#ifdef ENABLE_DRIVER_BATTERY
+	//cnstdetail:{"name":"$batteryVoltage",
+	//cnstdetail:"title":"$batteryVoltage",
+	//cnstdetail:"descr":"Battery driver voltage",
+	//cnstdetail:"requires":""}
+	{ "$batteryVoltage", &getBatteryVoltage },
+	//cnstdetail:{"name":"$batteryLevel",
+	//cnstdetail:"title":"$batteryLevel",
+	//cnstdetail:"descr":"Battery driver level",
+	//cnstdetail:"requires":""}
+	{ "$batteryLevel", &getBatteryLevel },
+#endif
 #endif
 	//cnstdetail:{"name":"$uptime",
 	//cnstdetail:"title":"$uptime",
@@ -369,6 +460,7 @@ static int g_totalConstants = sizeof(g_constants) / sizeof(g_constants[0]);
 // Returns true if constant matches
 // Returns false if no constants found
 const char *CMD_ExpandConstant(const char *s, const char *stop, float *out) {
+#if ENABLE_EXPAND_CONSTANT
 	const constant_t *var;
 	int i;
 	var = g_constants;
@@ -381,6 +473,7 @@ const char *CMD_ExpandConstant(const char *s, const char *stop, float *out) {
 			return ret;
 		}
 	}
+#endif
 	return false;
 }
 #if WINDOWS
